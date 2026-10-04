@@ -1,0 +1,50 @@
+name: Confidentiality Gate
+
+# Calls the confidentiality gate on every pull request into main. This repo is
+# public, and GitHub shares a private reusable workflow with private repos only,
+# so it calls the public copy of the Hub's bootstrap in
+# Inventeer/tool-confidentiality-gate, which a Hub check keeps equal to the
+# Hub's. What the gate checks, why it fails closed, and the emergency bypass:
+# Inventeer/inventeer-hub .github/workflows/confidentiality-gate.yml.
+#
+# This repo's settings:
+#   allow_sensitivity: O. Tier S content belongs in a Tier S repository and
+#     Tier R content never rests in git.
+#   max_tier: open. Everything here is published, so the repo holds only the
+#     base tier (HUB_Knowledge_Classification_Manifest_Standard section 6.6).
+#   company_tenant_direction: no-client-identifiers. A client identifier is
+#     never allowed in company knowledge.
+#
+# The gate refuses a pull request opened from a fork before it reads any
+# credential; push the branch to this repo to have it gated.
+#
+# Required status check: "gate / confidentiality-gate", registered in this
+# repo's "Confidentiality gate" ruleset for the default branch.
+#
+# Run by hand (Actions -> Confidentiality Gate -> Run workflow) to scan every
+# tracked file of the chosen branch instead of a pull request's added lines.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Supersede in-flight runs when a PR is updated.
+concurrency:
+  group: confidentiality-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    uses: Inventeer/tool-confidentiality-gate/.github/workflows/confidentiality-gate.yml@main
+    with:
+      hub_reader_app_id: ${{ vars.HUB_READER_APP_ID }}
+      allow_sensitivity: "O"
+      max_tier: open
+      company_tenant_direction: no-client-identifiers
+      scan: ${{ github.event_name == 'workflow_dispatch' && 'all' || 'diff' }}
+    secrets:
+      HUB_READER_APP_PRIVATE_KEY: ${{ secrets.HUB_READER_APP_PRIVATE_KEY }}
