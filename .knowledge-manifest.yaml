@@ -1,0 +1,16 @@
+# Root knowledge manifest for inventeer-knowledge-public, inherited by every
+# folder without its own manifest.
+# Public repo: everything here is published, so it holds only the base tier
+# (tier open) and the lint runs with a tier ceiling of open (section 6.6).
+# Read by the confidentiality gate and by assistant ingestion.
+# Schema: HUB_Knowledge_Classification_Manifest_Standard section 7.
+schema_version: "1.0"
+sensitivity: O
+audience:
+  tenant: inventeer
+  tier: open
+content_kinds: [document, standard]
+inherit: true
+owner: OPS
+effective_date: 2026-10-03
+notes: "Published company knowledge: the Public band, carried in its own repository."
