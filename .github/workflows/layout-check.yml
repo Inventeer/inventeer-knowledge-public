@@ -9,10 +9,9 @@ name: Layout Check
 # configuration, so this caller passes no setting of its own. What the check
 # reports: Inventeer/inventeer-hub .github/workflows/layout-check.yml.
 #
-# Warning mode: a finding appears as a warning on the pull request and never
-# blocks the merge, while the layout transition is open. The check reads no
-# credential for a pull request opened from a fork; push the branch to this
-# repo to have it checked.
+# Blocking: a finding fails the check, so a pull request that breaks the
+# layout cannot pass it. The check reads no credential for a pull request
+# opened from a fork; push the branch to this repo to have it checked.
 #
 # Run by hand (Actions -> Layout Check -> Run workflow) to check every tracked
 # file of the chosen branch, required folders included.
