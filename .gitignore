@@ -1,0 +1,11 @@
+# Leftover deletion-staging folders, at any depth: never committed (INV-5348)
+_to_delete/
+
+# Session scratch: drafts and working files, never committed
+.execution-workspace/
+
+# Agent-tool git worktrees created inside the checkout: never committed
+.claude/worktrees/
+
+# Authoring review sidecars: disposable, never committed
+*_Changes.md
