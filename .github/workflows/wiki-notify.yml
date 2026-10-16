@@ -1,0 +1,50 @@
+name: Wiki Notify
+
+# Asks Inventeer/tool-wiki to rebuild and publish the wiki when content it publishes changes here
+# (INV-4644). The build always reads the current main of every source; source and sha are
+# only logged on the tool-wiki run, but source must stay non-empty: it is what makes a failed
+# deploy open the "Wiki deploy failing" issue.
+#
+# Credential: the wiki notifier GitHub App (Actions: write on Inventeer/tool-wiki only). Its App ID
+# and private key are the organization secrets WIKI_NOTIFIER_APP_ID and
+# WIKI_NOTIFIER_APP_PRIVATE_KEY. The job runs in the wiki-notify environment, which accepts only main.
+#
+# paths only cuts noise. Keep it a superset of this source's include globs in
+# Inventeer/tool-wiki sources.yaml: a change outside it is not published until the next wiki deploy.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "**/*.md"
+      - "**/.knowledge-manifest.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    # GitHub-hosted: this repository is public, so it must not use the self-hosted
+    # inventeer-arm64 pool.
+    runs-on: ubuntu-latest
+    environment: wiki-notify
+    timeout-minutes: 5
+    steps:
+      - name: Mint wiki notifier token
+        id: app
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ secrets.WIKI_NOTIFIER_APP_ID }}
+          private-key: ${{ secrets.WIKI_NOTIFIER_APP_PRIVATE_KEY }}
+          owner: Inventeer
+          repositories: tool-wiki
+
+      - name: Dispatch the wiki deploy
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          gh api --method POST repos/Inventeer/tool-wiki/actions/workflows/deploy.yml/dispatches \
+            -f ref=main \
+            -f "inputs[source]=${GITHUB_REPOSITORY}" \
+            -f "inputs[sha]=${GITHUB_SHA}"
+          echo "Dispatched the wiki deploy for ${GITHUB_REPOSITORY}@${GITHUB_SHA}." >> "$GITHUB_STEP_SUMMARY"
