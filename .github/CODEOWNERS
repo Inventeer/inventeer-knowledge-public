@@ -1,7 +1,6 @@
-# Every path has a code owner team that can write to this repo, which the
-# confidentiality gate's code-owner check requires. Owners are teams, never
-# people (INV_Access_Management_SOP). The last matching line wins.
-#
-# Operations owns the repo until the product and area moves add their folders;
-# each folder they add gets its own line naming the Area team that writes it.
-* @Inventeer/area-ops-inventeer
+# Every path has one code owner, the founder's role team, `role-founder`, whose only
+# member is the founder, so a change to any path needs the founder's approval before
+# it merges. A code owner needs Write on the repository, so the team holds Write
+# here. Owners are teams, never people. The earlier line is in the history of this file.
+
+* @Inventeer/role-founder
