@@ -1,0 +1,95 @@
+name: PR Description
+
+# Fails a pull request whose description does not meet the Hub's
+# HUB_Pull_Request_Description_Standard (TLDR, Problem and This PR bullets,
+# Evidence, Handoff, no agent attribution). This repository is public, and
+# GitHub shares a private repository's reusable workflow with private
+# repositories only, so it runs the steps of the Hub's
+# .github/workflows/pr-description.yml inline instead of calling it. The rules
+# are not copied: the job fetches scripts/pr-conventions.py from the Hub with
+# the Hub reader App. Keep these steps equal to the Hub's when it changes. A
+# pull request opened by a bot, or from a fork, is skipped. Editing the
+# description runs the check again.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+concurrency:
+  group: pr-description-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: check
+    if: >-
+      github.event.pull_request.user.type != 'Bot'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Mint Hub reader token (inventeer-hub, Contents read)
+        id: hub
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.HUB_READER_APP_ID }}
+          private-key: ${{ secrets.HUB_READER_APP_PRIVATE_KEY }}
+          owner: Inventeer
+          repositories: inventeer-hub
+          permission-contents: read
+
+      - name: Fetch the description check from the Hub
+        env:
+          HUB_TOKEN: ${{ steps.hub.outputs.token }}
+          HUB_REF: main
+        run: |
+          set -euo pipefail
+          basic="$(printf 'x-access-token:%s' "$HUB_TOKEN" | base64 -w0)"
+          echo "::add-mask::$basic"
+          auth="AUTHORIZATION: basic $basic"
+          git -c init.defaultBranch=main init -q hub
+          git -C hub remote add origin https://github.com/Inventeer/inventeer-hub.git
+          git -C hub sparse-checkout set --no-cone /scripts/pr-conventions.py
+          fetched=false
+          for attempt in 1 2 3; do
+            if git -C hub -c http.extraheader="$auth" fetch -q --depth 1 --no-tags origin "$HUB_REF" \
+               && git -C hub -c advice.detachedHead=false checkout -q FETCH_HEAD; then
+              fetched=true
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Download from the Hub failed (attempt $attempt of 3); retrying in $((attempt * 10)) seconds."
+              sleep $((attempt * 10))
+            fi
+          done
+          if [ "$fetched" != true ]; then
+            echo "::error title=Transient download failure, rerun the job::Could not download scripts/pr-conventions.py from the Hub at ref '$HUB_REF' after 3 attempts. Nothing in this pull request caused it. Rerun the failed job."
+            exit 1
+          fi
+
+      # The self-hosted inventeer-arm64 image ships no Python.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+      - name: Check the description
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -uo pipefail
+          printf '%s\n' "$PR_BODY" > "$RUNNER_TEMP/description.md"
+          export GIT_PUSH_DESCRIPTION_FILE="$RUNNER_TEMP/description.md"
+          if python3 hub/scripts/pr-conventions.py check --repo hub --base main --message unused 2> "$RUNNER_TEMP/problems.txt"; then
+            echo "The description meets HUB_Pull_Request_Description_Standard."
+            exit 0
+          fi
+          cat "$RUNNER_TEMP/problems.txt"
+          problems="$(grep '^  - ' "$RUNNER_TEMP/problems.txt" | sed 's/^  - //' | paste -sd ';' - | sed 's/;/; /g')"
+          echo "::error title=Description outside the standard::${problems}. Edit the description (HUB_Pull_Request_Description_Standard, or start from the repository's pull request template); the check runs again on save."
+          exit 1
